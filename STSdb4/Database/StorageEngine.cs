@@ -7,7 +7,6 @@ using STSdb4.Storage;
 using STSdb4.WaterfallTree;
 using System.Linq;
 using STSdb4.General.IO;
-using System.Management;
 using System.Collections.Generic;
 using System.Collections;
 using System.Diagnostics;
