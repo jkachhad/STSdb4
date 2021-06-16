@@ -210,7 +210,7 @@ namespace STSdb4.Data
                 if (type == typeof(byte[]))
                     return Expression.Call(typeof(ByteArrayExtensions).GetMethod("GetHashCodeEx", new Type[] { typeof(byte[]) }), value);
 
-                return Expression.Call(value, type.GetMethod("GetHashCode"));
+                return Expression.Call(value, type.GetMethod("GetHashCode", new Type[] { }));
             }
 
             if (type == typeof(Guid))
