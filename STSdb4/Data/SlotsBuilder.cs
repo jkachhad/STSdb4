@@ -24,11 +24,8 @@ namespace STSdb4.Data
 
             if (types.Length == 0)
                 throw new ArgumentException("types.Length == 0");
-
-            if (STSdb4.General.Environment.RunningOnMono)
-                return BuildTypeCodeDom(baseInterface, className, fieldsPrefix, types);
-            else
-                return BuildTypeEmit(baseInterface, className, fieldsPrefix, types);
+            
+            return BuildTypeEmit(baseInterface, className, fieldsPrefix, types);
         }
 
         private static Type BuildTypeEmit(Type baseInterface, string className, string fieldsPrefix, params Type[] types)
@@ -70,86 +67,6 @@ namespace STSdb4.Data
             ilGenerator.Emit(OpCodes.Ret);
 
             return typeBuilder.CreateType().MakeGenericType(types);
-        }
-
-        private static Type BuildTypeCodeDom(Type baseInterface, string className, string fieldsPrefix, params Type[] types)
-        {
-            var compileUnit = new CodeCompileUnit();
-            CodeNamespace globalNamespace = new CodeNamespace();
-
-            globalNamespace.Imports.Add(new CodeNamespaceImport("System"));
-            globalNamespace.Imports.Add(new CodeNamespaceImport("System.Collections.Generic"));
-            globalNamespace.Imports.Add(new CodeNamespaceImport("System.Linq"));
-            globalNamespace.Imports.Add(new CodeNamespaceImport("System.Text"));
-
-            var classNamespace = new CodeNamespace("STSdb4.Data");
-
-            var generatedClass = new CodeTypeDeclaration(className);
-            generatedClass.IsClass = true;
-            generatedClass.Attributes = MemberAttributes.Public;
-
-            for (int i = 0; i < types.Length; i++)
-                generatedClass.TypeParameters.Add(new CodeTypeParameter("T" + fieldsPrefix + i));
-
-            if(baseInterface != null)
-                generatedClass.BaseTypes.Add(baseInterface);
-
-            var serializableAttribute = new CodeTypeReference(typeof(System.SerializableAttribute));
-            generatedClass.CustomAttributes.Add(new CodeAttributeDeclaration(serializableAttribute));
-
-            classNamespace.Types.Add(generatedClass);
-
-            compileUnit.Namespaces.Add(globalNamespace);
-            compileUnit.Namespaces.Add(classNamespace);
-
-            CodeMemberField[] fields = new CodeMemberField[types.Length];
-
-            for (int i = 0; i < fields.Length; i++)
-            {
-                fields[i] = new CodeMemberField("T" + fieldsPrefix + i, fieldsPrefix + i);
-                fields[i].Attributes = MemberAttributes.Public;
-                generatedClass.Members.Add(fields[i]);
-            }
-
-            CodeConstructor defaultConstructor = new CodeConstructor();
-            defaultConstructor.Attributes = MemberAttributes.Public;
-
-            generatedClass.Members.Add(defaultConstructor);
-
-            CodeConstructor constructor = new CodeConstructor();
-            constructor.Attributes = MemberAttributes.Public;
-
-            for (int i = 0; i < types.Length; i++)
-            {
-                CodeTypeReference type = new CodeTypeReference("T" + fieldsPrefix + i);
-                constructor.Parameters.Add(new CodeParameterDeclarationExpression(type, fieldsPrefix.ToLower() + i));
-            }
-
-            for (int i = 0; i < types.Length; i++)
-            {
-                CodeFieldReferenceExpression left = new CodeFieldReferenceExpression(new CodeThisReferenceExpression(), fieldsPrefix + i);
-                constructor.Statements.Add(new CodeAssignStatement(left, new CodeArgumentReferenceExpression(fieldsPrefix.ToLower() + i)));
-            }
-
-            generatedClass.Members.Add(constructor);
-
-            string stsdbAssemblyName = Assembly.GetExecutingAssembly().Location;
-            string[] assemblies = { "System.dll", "mscorlib.dll", stsdbAssemblyName };
-
-            CompilerParameters parameters = new CompilerParameters(assemblies);
-
-            CodeDomProvider runTimeProvider = new Microsoft.CSharp.CSharpCodeProvider();
-            parameters = new CompilerParameters(assemblies);
-
-            parameters.GenerateExecutable = false;
-            parameters.GenerateInMemory = true;
-            parameters.IncludeDebugInformation = true;
-            parameters.CompilerOptions = "/optimize";
-
-            CompilerResults compilerResults = runTimeProvider.CompileAssemblyFromDom(parameters, compileUnit);
-            var generatedType = compilerResults.CompiledAssembly.GetTypes()[0];
-
-            return generatedType.MakeGenericType(types);
         }
 
         public static Type BuildType(params Type[] types)

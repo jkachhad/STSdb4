@@ -144,7 +144,6 @@
     <Compile Include="General\Collections\SortedSetPatch.cs" />
     <Compile Include="General\Compression\DeltaCompression.cs" />
     <Compile Include="General\Diagnostics\MemoryMonitor.cs" />
-    <Compile Include="General\Environment.cs" />
     <Compile Include="General\Extensions\DecimalExtensions.cs" />
     <Compile Include="General\Extensions\KeyValuePairExtensions.cs" />
     <Compile Include="General\Extensions\ListExtensions.cs" />
