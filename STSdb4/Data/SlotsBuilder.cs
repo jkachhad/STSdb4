@@ -31,7 +31,7 @@ namespace STSdb4.Data
         private static Type BuildTypeEmit(Type baseInterface, string className, string fieldsPrefix, params Type[] types)
         {
             var assemblyName = new AssemblyName(className);
-            AssemblyBuilder assemblyBuilder = AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
+            AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
             ModuleBuilder moduleBuilder = assemblyBuilder.DefineDynamicModule(assemblyName.Name);
 
             string[] genericParameters = new string[types.Length];
