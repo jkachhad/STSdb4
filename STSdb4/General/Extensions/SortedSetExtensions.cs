@@ -166,6 +166,11 @@ namespace STSdb4.General.Extensions
             split4NodeMethod = sortedSetType.GetMethod("Split4Node");
             isRedMethod = sortedSetType.GetMethod("IsRed");
             insertionBalanceMethod = sortedSetType.GetMethod("InsertionBalance");
+#elif NET5_0
+            is4NodeMethod = nodeType.GetProperty("Is4Node").GetGetMethod();
+            split4NodeMethod = nodeType.GetMethod("Split4Node");
+            isRedMethod = nodeType.GetProperty("IsRed").GetGetMethod();
+            insertionBalanceMethod = sortedSetType.GetMethod("InsertionBalance");
 #else
             is4NodeMethod = sortedSetType.GetMethod("Is4Node", BindingFlags.NonPublic | BindingFlags.Static);
             split4NodeMethod = sortedSetType.GetMethod("Split4Node", BindingFlags.NonPublic | BindingFlags.Static);
@@ -185,11 +190,19 @@ namespace STSdb4.General.Extensions
                             Expression.Return(exitPoint, Expression.Constant(true))
                                     )
                                 ),
-
+#if NET5_0
+                    Expression.IfThen(Expression.Call(root, is4NodeMethod),
+#else
                     Expression.IfThen(Expression.Call(is4NodeMethod, root),
+#endif
                                   Expression.Block(
+#if NET5_0
+                                            Expression.Call(root, split4NodeMethod),
+                                            Expression.IfThen(Expression.Call(node, isRedMethod),
+#else                                            
                                             Expression.Call(split4NodeMethod, root),
                                             Expression.IfThen(Expression.Call(isRedMethod, node),
+#endif
                                                 Expression.Call(set, insertionBalanceMethod, root, node, grandParent, greatGrandParent)
                                         )
                                     )
@@ -260,10 +273,10 @@ namespace STSdb4.General.Extensions
             //            return true;
             //        }
 
-            //        if (SortedSet<T>.Is4Node(root))
+            //        if (SortedSet<T>.Is4Node(root))  => if (root.Is4Node)
             //        {
-            //            SortedSet<T>.Split4Node(root);
-            //            if (SortedSet<T>.IsRed(node))
+            //            SortedSet<T>.Split4Node(root) => root.Split4Node;
+            //            if (SortedSet<T>.IsRed(node)) => if (node.IsRed)
             //                set.InsertionBalance(root, ref node, grandParent, greatGrandParent);
             //        }
 
