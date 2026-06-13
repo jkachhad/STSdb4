@@ -132,7 +132,7 @@ namespace STSdb4.Storage
             if (pendingWrites.Count == 0)
                 return;
 
-            long nextPosition = long.MinValue;
+            long nextPosition = -1;
             foreach (var kv in pendingWrites.OrderBy(x => x.Key))
             {
                 if (kv.Key != nextPosition)
@@ -162,7 +162,7 @@ namespace STSdb4.Storage
                 using (MemoryStream stream = new MemoryStream(pendingBuffer, sizeof(int), pendingBuffer.Length - sizeof(int)))
                 {
                     using (DeflateStream decompress = new DeflateStream(stream, CompressionMode.Decompress))
-                        decompress.Read(raw, 0, raw.Length);
+                        ReadExactly(decompress, raw, 0, raw.Length);
                 }
 
                 return raw;
@@ -183,13 +183,26 @@ namespace STSdb4.Storage
                 using (MemoryStream stream = new MemoryStream(buffer))
                 {
                     using (DeflateStream decompress = new DeflateStream(stream, CompressionMode.Decompress))
-                        decompress.Read(raw, 0, raw.Length);
+                        ReadExactly(decompress, raw, 0, raw.Length);
                 }
 
                 buffer = raw;
             }
 
             return buffer;
+        }
+
+        private static void ReadExactly(Stream stream, byte[] buffer, int index, int count)
+        {
+            int read;
+            while (count > 0 && (read = stream.Read(buffer, index, count)) > 0)
+            {
+                index += read;
+                count -= read;
+            }
+
+            if (count != 0)
+                throw new EndOfStreamException("Cannot read all expected bytes.");
         }
 
         private void Serialize(BinaryWriter writer)
