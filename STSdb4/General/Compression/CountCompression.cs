@@ -30,7 +30,7 @@ namespace STSdb4.General.Compression
 
         private static void InternalSerialize(BinaryWriter writer, ulong number)
         {
-            byte[] buffer = new byte[10];
+            Span<byte> buffer = stackalloc byte[10];
             int index = 0;
 
             while (number >= 0x80)
@@ -43,7 +43,7 @@ namespace STSdb4.General.Compression
             buffer[index] = (byte)number;
             index++;
 
-            writer.Write(buffer, 0, index);
+            writer.Write(buffer.Slice(0, index));
         }
 
         /// <summary>

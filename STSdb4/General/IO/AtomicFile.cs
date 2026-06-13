@@ -1,4 +1,4 @@
-﻿using STSdb4.General.Comparers;
+﻿using STSdb4.General.Buffers;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -10,16 +10,13 @@ namespace STSdb4.General.IO
 {
     public class AtomicFile
     {
-        private byte[] HEADER = new byte[512];
-        private CommonArray commonArray = new CommonArray();
+        private readonly byte[] HEADER = new byte[512];
 
         private Stream stream;
         public string FileName { get; private set; }
 
         public AtomicFile(string fileName)
         {
-            commonArray.ByteArray = HEADER;
-
             stream = new FileStream(fileName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
             FileName = fileName;
 
@@ -35,14 +32,14 @@ namespace STSdb4.General.IO
 
         private long Pos
         {
-            get { return commonArray.Int64Array[0]; }
-            set { commonArray.Int64Array[0] = value; }
+            get { return ByteSpan.ReadInt64(HEADER, 0); }
+            set { ByteSpan.WriteInt64(HEADER, 0, value); }
         }
 
         public int Size
         {
-            get { return (int)commonArray.Int64Array[1]; }
-            private set { commonArray.Int64Array[1] = value; }
+            get { return (int)ByteSpan.ReadInt64(HEADER, sizeof(long)); }
+            private set { ByteSpan.WriteInt64(HEADER, sizeof(long), value); }
         }
 
         public void Write(byte[] buffer, int index, int count)

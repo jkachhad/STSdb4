@@ -180,6 +180,7 @@
     <Compile Include="WaterfallTree\IOperationCollectionFactory.cs" />
     <Compile Include="Data\CompareOption.cs" />
     <Compile Include="Database\XStreamApply.cs" />
+    <Compile Include="General\Buffers\ByteSpan.cs" />
     <Compile Include="General\Buffers\BitUtils.cs" />
     <Compile Include="General\Collections\Cache.cs" />
     <Compile Include="General\Collections\IOrderedSet.cs" />

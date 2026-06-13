@@ -1,4 +1,4 @@
-﻿using STSdb4.General.Comparers;
+﻿using STSdb4.General.Buffers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,30 +12,23 @@ namespace STSdb4.General.Extensions
 
         public static int GetHashCodeEx(this byte[] buffer)
         {
+            return GetHashCodeEx((ReadOnlySpan<byte>)buffer);
+        }
+
+        public static int GetHashCodeEx(this ReadOnlySpan<byte> buffer)
+        {
             const int CONSTANT = 17;
             int hashCode = 37;
 
-            CommonArray common = new CommonArray();
-            common.ByteArray = buffer;
-            int[] array = common.Int32Array;
-
             int length = buffer.Length;
-            int remainder = length & 3;
-            int len = length >> 2;
+            int fullLength = length & ~3;
 
-            int i = 0;
+            for (int offset = 0; offset < fullLength; offset += sizeof(int))
+                hashCode = CONSTANT * hashCode + unchecked((int)ByteSpan.ReadUInt32(buffer, offset));
 
-            while (i < len)
-            {
-                hashCode = CONSTANT * hashCode + array[i];
-                i++;
-            }
-
+            int remainder = length - fullLength;
             if (remainder > 0)
-            {
-                int shift = sizeof(uint) - remainder;
-                hashCode = CONSTANT * hashCode + ((array[i] << shift) >> shift);
-            }
+                hashCode = CONSTANT * hashCode + unchecked((int)ByteSpan.ReadUInt32Partial(buffer, fullLength, remainder));
 
             return hashCode;
         }
@@ -48,6 +41,11 @@ namespace STSdb4.General.Extensions
         /// <returns></returns>
         public static int MurMurHash3(this byte[] buffer, int seed = 37)
         {
+            return MurMurHash3((ReadOnlySpan<byte>)buffer, seed);
+        }
+
+        public static int MurMurHash3(this ReadOnlySpan<byte> buffer, int seed = 37)
+        {
             const uint c1 = 0xcc9e2d51;
             const uint c2 = 0x1b873593;
             const int r1 = 15;
@@ -57,19 +55,12 @@ namespace STSdb4.General.Extensions
 
             uint hash = (uint)seed;
 
-            CommonArray common = new CommonArray();
-            common.ByteArray = buffer;
-            uint[] array = common.UInt32Array;
-
             int length = buffer.Length;
-            int remainder = length & 3;
-            int len = length >> 2;
+            int fullLength = length & ~3;
 
-            int i = 0;
-
-            while (i < len)
+            for (int offset = 0; offset < fullLength; offset += sizeof(uint))
             {
-                uint k = array[i];
+                uint k = ByteSpan.ReadUInt32(buffer, offset);
 
                 k *= c1;
                 k = (k << r1) | (k >> (32 - r1)); //k = rotl32(k, r1);
@@ -78,14 +69,12 @@ namespace STSdb4.General.Extensions
                 hash ^= k;
                 hash = (hash << r2) | (hash >> (32 - r2)); //hash = rotl32(hash, r2);
                 hash = hash * m + n;
-
-                i++;
             }
 
+            int remainder = length - fullLength;
             if (remainder > 0)
             {
-                int shift = sizeof(uint) - remainder;
-                uint k = (array[i] << shift) >> shift;
+                uint k = ByteSpan.ReadUInt32Partial(buffer, fullLength, remainder);
 
                 k *= c1;
                 k = (k << r1) | (k >> (32 - r1)); //k = rotl32(k, r1);
@@ -129,6 +118,11 @@ namespace STSdb4.General.Extensions
         /// <param name="buffer"></param>
         /// <returns></returns>
         public static string ToHex(this byte[] buffer)
+        {
+            return ToHex((ReadOnlySpan<byte>)buffer);
+        }
+
+        public static string ToHex(this ReadOnlySpan<byte> buffer)
         {
             StringBuilder sb = new StringBuilder(2 * buffer.Length);
 
