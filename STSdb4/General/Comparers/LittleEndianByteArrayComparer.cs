@@ -1,4 +1,5 @@
-﻿using System;
+﻿using STSdb4.General.Buffers;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,46 +13,43 @@ namespace STSdb4.General.Comparers
         
         public int Compare(byte[] x, byte[] y, int length)
         {
-            CommonArray common = new CommonArray();
-            common.ByteArray = x;
-            ulong[] array1 = common.UInt64Array;
-            common.ByteArray = y;
-            ulong[] array2 = common.UInt64Array;
+            return Compare((ReadOnlySpan<byte>)x, (ReadOnlySpan<byte>)y, length);
+        }
 
-            int len = length >> 3;
+        public int Compare(ReadOnlySpan<byte> x, ReadOnlySpan<byte> y, int length)
+        {
             int remainder = length & 7;
-
-            int i = len;
+            int offset = length - remainder;
 
             if (remainder > 0)
             {
-                int shift = sizeof(ulong) - remainder;
-                var v1 = (array1[i] << shift) >> shift;
-                var v2 = (array2[i] << shift) >> shift;
+                ulong v1 = ByteSpan.ReadUInt64Partial(x, offset, remainder);
+                ulong v2 = ByteSpan.ReadUInt64Partial(y, offset, remainder);
                 if (v1 < v2)
                     return -1;
                 if (v1 > v2)
                     return 1;
             }
 
-            i--;
-
-            while (i >= 0)
+            for (offset -= sizeof(ulong); offset >= 0; offset -= sizeof(ulong))
             {
-                var v1 = array1[i];
-                var v2 = array2[i];
+                ulong v1 = ByteSpan.ReadUInt64(x, offset);
+                ulong v2 = ByteSpan.ReadUInt64(y, offset);
                 if (v1 < v2)
                     return -1;
                 if (v1 > v2)
                     return 1;
-
-                i--;
             }
 
             return 0;
         }
 
         public int Compare(byte[] x, byte[] y)
+        {
+            return Compare((ReadOnlySpan<byte>)x, (ReadOnlySpan<byte>)y);
+        }
+
+        public int Compare(ReadOnlySpan<byte> x, ReadOnlySpan<byte> y)
         {
             if (x.Length == y.Length)
                 return Compare(x, y, x.Length);
@@ -66,7 +64,7 @@ namespace STSdb4.General.Comparers
 
             if (x.Length < y.Length)
                 return -1;
-            if (y.Length > y.Length)
+            if (x.Length > y.Length)
                 return 1;
 
             return 0;

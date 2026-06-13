@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using STSdb4.General.Buffers;
 using STSdb4.General.Comparers;
@@ -117,10 +118,9 @@ namespace STSdb4.General.Compression
 
             bool writeSign = helper.Type == HelperType.Delta;
 
-            CommonArray common = new CommonArray();
             int sizeBits = helper.SizeBits > 0 ? helper.SizeBits : (1 + 1 + 64) * (count - 1);
-            common.ByteArray = new byte[(int)Math.Ceiling(sizeBits / 8.0)];
-            ulong[] data = common.UInt64Array;
+            int byteCapacity = (int)Math.Ceiling(sizeBits / 8.0);
+            ulong[] data = new ulong[ByteSpan.GetUInt64Length(byteCapacity) + 1];
             int bitIndex = 0;
 
             ulong delta;
@@ -172,7 +172,7 @@ namespace STSdb4.General.Compression
 
             int bytesCount = (int)Math.Ceiling(bitIndex / 8.0);
             CountCompression.Serialize(writer, (ulong)bytesCount);
-            writer.Write(common.ByteArray, 0, bytesCount);
+            writer.Write(MemoryMarshal.AsBytes(data.AsSpan()).Slice(0, bytesCount));
         }
 
         public static void Decompress(BinaryReader reader, Action<int, long> values, int count)
@@ -224,10 +224,10 @@ namespace STSdb4.General.Compression
             bool sign = helper.Sign;
             int bitCount = helper.DeltaBits;
 
-            CommonArray common = new CommonArray();
             int bytesCount = (int)CountCompression.Deserialize(reader);
-            common.ByteArray = reader.ReadBytes(bytesCount);
-            ulong[] data = common.UInt64Array;
+            byte[] raw = reader.ReadBytes(bytesCount);
+            ulong[] data = new ulong[ByteSpan.GetUInt64Length(bytesCount) + 1];
+            raw.AsSpan().CopyTo(MemoryMarshal.AsBytes(data.AsSpan()));
             int bitIndex = 0;
 
             for (; index <= maxIndex; index++)

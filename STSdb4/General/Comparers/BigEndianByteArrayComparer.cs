@@ -1,4 +1,5 @@
-﻿using System;
+﻿using STSdb4.General.Buffers;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,25 +13,23 @@ namespace STSdb4.General.Comparers
         
         public int Compare(byte[] x, byte[] y, int length)
         {
-            CommonArray common = new CommonArray();
-            common.ByteArray = x;
-            ulong[] array1 = common.UInt64Array;
-            common.ByteArray = y;
-            ulong[] array2 = common.UInt64Array;
+            return Compare((ReadOnlySpan<byte>)x, (ReadOnlySpan<byte>)y, length);
+        }
 
-            int len = length >> 3;
-
-            for (int i = 0; i < len; i++)
+        public int Compare(ReadOnlySpan<byte> x, ReadOnlySpan<byte> y, int length)
+        {
+            int fullLength = length & ~7;
+            for (int offset = 0; offset < fullLength; offset += sizeof(ulong))
             {
-                var v1 = array1[i];
-                var v2 = array2[i];
+                ulong v1 = ByteSpan.ReadUInt64(x, offset);
+                ulong v2 = ByteSpan.ReadUInt64(y, offset);
 
                 if (v1 != v2)
                 {
-                    for (int j = i << 3; ; j++)
+                    for (int i = 0; i < sizeof(ulong); i++)
                     {
-                        byte b1 = x[j];
-                        byte b2 = y[j];
+                        byte b1 = x[offset + i];
+                        byte b2 = y[offset + i];
                         if (b1 < b2)
                             return -1;
                         if (b1 > b2)
@@ -39,93 +38,25 @@ namespace STSdb4.General.Comparers
                 }
             }
 
-            int index = len << 3; 
-
-            switch (length & 7)
+            for (int offset = fullLength; offset < length; offset++)
             {
-                case 7:
-                    {
-                        var b1 = x[index];
-                        var b2 = y[index];
-                        if (b1 < b2)
-                            return -1;
-                        if (b1 > b2)
-                            return 1;
-                        index++;
-                        goto case 6;
-                    }
-                case 6:
-                    {
-                        var b1 = x[index];
-                        var b2 = y[index];
-                        if (b1 < b2)
-                            return -1;
-                        if (b1 > b2)
-                            return 1;
-                        index++;
-                        goto case 5;
-                    }
-                case 5:
-                    {
-                        var b1 = x[index];
-                        var b2 = y[index];
-                        if (b1 < b2)
-                            return -1;
-                        if (b1 > b2)
-                            return 1;
-                        index++;
-                        goto case 4;
-                    }
-                case 4:
-                    {
-                        var b1 = x[index];
-                        var b2 = y[index];
-                        if (b1 < b2)
-                            return -1;
-                        if (b1 > b2)
-                            return 1;
-                        index++;
-                        goto case 3;
-                    }
-                case 3:
-                    {
-                        var b1 = x[index];
-                        var b2 = y[index];
-                        if (b1 < b2)
-                            return -1;
-                        if (b1 > b2)
-                            return 1;
-                        index++;
-                        goto case 2;
-                    }
-                case 2:
-                    {
-                        var b1 = x[index];
-                        var b2 = y[index];
-                        if (b1 < b2)
-                            return -1;
-                        if (b1 > b2)
-                            return 1;
-                        index++;
-                        goto case 1;
-                    }
-                case 1:
-                    {
-                        var b1 = x[index];
-                        var b2 = y[index];
-                        if (b1 < b2)
-                            return -1;
-                        if (b1 > b2)
-                            return 1;
-
-                        break;
-                    }
+                byte b1 = x[offset];
+                byte b2 = y[offset];
+                if (b1 < b2)
+                    return -1;
+                if (b1 > b2)
+                    return 1;
             }
 
             return 0;
         }
 
         public int Compare(byte[] x, byte[] y)
+        {
+            return Compare((ReadOnlySpan<byte>)x, (ReadOnlySpan<byte>)y);
+        }
+
+        public int Compare(ReadOnlySpan<byte> x, ReadOnlySpan<byte> y)
         {
             int cmp = Compare(x, y, Math.Min(x.Length, y.Length));
             if (cmp != 0)
