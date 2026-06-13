@@ -21,6 +21,7 @@ namespace STSdb4.Storage
         //handle -> pointer
         private readonly Dictionary<long, Pointer> used;
         private readonly Dictionary<long, Pointer> reserved;
+        private readonly SortedDictionary<long, byte[]> pendingWrites;
 
         private long currentVersion;
         private long maxHandle;
@@ -51,6 +52,7 @@ namespace STSdb4.Storage
 
             used = new Dictionary<long, Pointer>();
             reserved = new Dictionary<long, Pointer>();
+            pendingWrites = new SortedDictionary<long, byte[]>();
 
             if (stream.Length < AtomicHeader.SIZE) //create new
             {
@@ -101,17 +103,71 @@ namespace STSdb4.Storage
 
         private void InternalWrite(long position, int originalCount, byte[] buffer, int index, int count)
         {
-            BinaryWriter writer = new BinaryWriter(Stream);
-            Stream.Seek(position, SeekOrigin.Begin);
+            byte[] payload;
+            if (!UseCompression)
+            {
+                payload = new byte[count];
+                Buffer.BlockCopy(buffer, index, payload, 0, count);
+            }
+            else
+            {
+                payload = new byte[sizeof(int) + count];
+                Buffer.BlockCopy(BitConverter.GetBytes(originalCount), 0, payload, 0, sizeof(int));
+                Buffer.BlockCopy(buffer, index, payload, sizeof(int), count);
+            }
 
-            if (UseCompression)
-                writer.Write(originalCount);
+            pendingWrites[position] = payload;
+        }
 
-            writer.Write(buffer, index, count);
+        private void RemovePendingWrite(Ptr ptr)
+        {
+            if (ptr == Ptr.NULL)
+                return;
+
+            pendingWrites.Remove(ptr.Position);
+        }
+
+        private void FlushPendingWrites()
+        {
+            if (pendingWrites.Count == 0)
+                return;
+
+            long nextPosition = -1;
+            foreach (var kv in pendingWrites)
+            {
+                if (kv.Key != nextPosition)
+                    Stream.Seek(kv.Key, SeekOrigin.Begin);
+
+                byte[] payload = kv.Value;
+                Stream.Write(payload, 0, payload.Length);
+                nextPosition = kv.Key + payload.Length;
+            }
+
+            pendingWrites.Clear();
         }
 
         private byte[] InternalRead(long position, long size)
         {
+            byte[] pendingBuffer;
+            if (pendingWrites.TryGetValue(position, out pendingBuffer))
+            {
+                if (!UseCompression)
+                {
+                    var data = new byte[(int)size];
+                    Buffer.BlockCopy(pendingBuffer, 0, data, 0, data.Length);
+                    return data;
+                }
+
+                byte[] raw = new byte[BitConverter.ToInt32(pendingBuffer, 0)];
+                using (MemoryStream stream = new MemoryStream(pendingBuffer, sizeof(int), pendingBuffer.Length - sizeof(int)))
+                {
+                    using (DeflateStream decompress = new DeflateStream(stream, CompressionMode.Decompress))
+                        ReadExactly(decompress, raw, 0, raw.Length);
+                }
+
+                return raw;
+            }
+
             BinaryReader reader = new BinaryReader(Stream);
             Stream.Seek(position, SeekOrigin.Begin);
 
@@ -127,13 +183,26 @@ namespace STSdb4.Storage
                 using (MemoryStream stream = new MemoryStream(buffer))
                 {
                     using (DeflateStream decompress = new DeflateStream(stream, CompressionMode.Decompress))
-                        decompress.Read(raw, 0, raw.Length);
+                        ReadExactly(decompress, raw, 0, raw.Length);
                 }
 
                 buffer = raw;
             }
 
             return buffer;
+        }
+
+        private static void ReadExactly(Stream stream, byte[] buffer, int index, int count)
+        {
+            int read;
+            while (count > 0 && (read = stream.Read(buffer, index, count)) > 0)
+            {
+                index += read;
+                count -= read;
+            }
+
+            if (count != 0)
+                throw new EndOfStreamException("Cannot read all expected bytes.");
         }
 
         private void Serialize(BinaryWriter writer)
@@ -227,7 +296,10 @@ namespace STSdb4.Storage
                     return; //throw new ArgumentException("handle");
 
                 if (pointer.Version == currentVersion)
+                {
+                    RemovePendingWrite(pointer.Ptr);
                     space.Free(pointer.Ptr);
+                }
                 else
                 {
                     pointer.IsReserved = true;
@@ -275,7 +347,10 @@ namespace STSdb4.Storage
                 if (used.TryGetValue(handle, out pointer))
                 {
                     if (pointer.Version == currentVersion)
+                    {
+                        RemovePendingWrite(pointer.Ptr);
                         space.Free(pointer.Ptr);
+                    }
                     else
                     {
                         pointer.IsReserved = true;
@@ -310,6 +385,7 @@ namespace STSdb4.Storage
         {
             lock (SyncRoot)
             {
+                FlushPendingWrites();
                 Stream.Flush();
 
                 FreeOldVersions();
