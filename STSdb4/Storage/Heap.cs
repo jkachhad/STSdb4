@@ -21,7 +21,7 @@ namespace STSdb4.Storage
         //handle -> pointer
         private readonly Dictionary<long, Pointer> used;
         private readonly Dictionary<long, Pointer> reserved;
-        private readonly Dictionary<long, byte[]> pendingWrites;
+        private readonly SortedDictionary<long, byte[]> pendingWrites;
 
         private long currentVersion;
         private long maxHandle;
@@ -52,7 +52,7 @@ namespace STSdb4.Storage
 
             used = new Dictionary<long, Pointer>();
             reserved = new Dictionary<long, Pointer>();
-            pendingWrites = new Dictionary<long, byte[]>();
+            pendingWrites = new SortedDictionary<long, byte[]>();
 
             if (stream.Length < AtomicHeader.SIZE) //create new
             {
@@ -133,7 +133,7 @@ namespace STSdb4.Storage
                 return;
 
             long nextPosition = -1;
-            foreach (var kv in pendingWrites.OrderBy(x => x.Key))
+            foreach (var kv in pendingWrites)
             {
                 if (kv.Key != nextPosition)
                     Stream.Seek(kv.Key, SeekOrigin.Begin);
@@ -386,6 +386,7 @@ namespace STSdb4.Storage
             lock (SyncRoot)
             {
                 FlushPendingWrites();
+                Stream.Flush();
 
                 FreeOldVersions();
 
